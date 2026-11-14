@@ -35,8 +35,7 @@ ConvertSqlSelection(editor) {
 
         log := A_Clipboard
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
-        executable := A_ScriptDir "\Zea.SqlLogConvert.exe"
-        sql := ConvertSqlLogText(log, executable)
+        sql := ConvertAndFormatSqlText(log, A_ScriptDir)
         if !WinActive(editor)
             return
 
@@ -77,6 +76,15 @@ ClipboardHasWholeLine() {
             return true
     }
     return false
+}
+
+ConvertAndFormatSqlText(log, directory) {
+    sql := ConvertSqlLogText(log, directory "\Zea.SqlLogConvert.exe")
+    formatter := directory "\Zea.SqlFormat.exe"
+    if !FileExist(formatter)
+        throw Error("SQL Formatter not found: " formatter)
+
+    return ConvertSqlLogText(sql, formatter)
 }
 
 ConvertSqlLogText(log, executable) {
