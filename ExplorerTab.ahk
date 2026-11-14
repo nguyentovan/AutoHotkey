@@ -1,5 +1,8 @@
 ﻿#Requires AutoHotkey v2.0
 
+if A_LineFile = A_ScriptFullPath
+    ExitApp()
+
 desktopFolderOpen := 0
 WatchExplorerWindows()
 

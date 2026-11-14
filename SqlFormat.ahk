@@ -1,5 +1,8 @@
 ﻿#Requires AutoHotkey v2.0
 
+if A_LineFile = A_ScriptFullPath
+    ExitApp()
+
 ; Main includes this variant before the converter so both commands share Ctrl+K.
 #HotIf IsSqlFormatEditor()
 $^k:: {
@@ -20,19 +23,21 @@ $^k:: {
     if GetKeyState("Ctrl", "P") || !WinActive(editor)
         return
     if key = "Y"
-        ConvertSqlSelection(editor)
+        GetSqlConvertFunction("ConvertSqlSelection").Call(editor)
     else
         FormatSqlSelection(editor)
 }
 #HotIf
 
 IsSqlFormatEditor() {
-    return WinActive("ahk_exe ssms.exe") || WinActive("ahk_exe dbeaver.exe")
+    return (WinActive("ahk_exe ssms.exe") || WinActive("ahk_exe dbeaver.exe"))
+        && GetSqlConvertFunction("ConvertSqlSelection")
 }
 
 FormatSqlSelection(editor) {
     originalClipboard := ClipboardAll()
     errorMessage := ""
+    clipboardHasWholeLine := GetSqlConvertFunction("ClipboardHasWholeLine")
     try {
         A_Clipboard := ""
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
@@ -40,7 +45,7 @@ FormatSqlSelection(editor) {
         copied := ClipWait(1)
         if copied
             clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
-        if !copied || ClipboardHasWholeLine()
+        if !copied || clipboardHasWholeLine.Call()
             throw Error("Select the SQL to format first.")
 
         inputText := A_Clipboard
@@ -59,7 +64,7 @@ FormatSqlSelection(editor) {
         copied := ClipWait(1)
         if copied
             clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
-        if !copied || ClipboardHasWholeLine()
+        if !copied || clipboardHasWholeLine.Call()
             return
         selection := A_Clipboard
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
@@ -84,5 +89,10 @@ FormatSqlText(inputText, executable) {
     if !FileExist(executable)
         throw Error("SQL Formatter not found: " executable)
 
-    return ConvertSqlLogText(inputText, executable)
+    return GetSqlConvertFunction("ConvertSqlLogText").Call(inputText, executable)
+}
+
+GetSqlConvertFunction(name) {
+    global
+    return IsSet(%name%) ? %name% : false
 }

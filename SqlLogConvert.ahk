@@ -1,5 +1,8 @@
 ﻿#Requires AutoHotkey v2.0
 
+if A_LineFile = A_ScriptFullPath
+    ExitApp()
+
 #HotIf WinActive("ahk_exe ssms.exe") || WinActive("ahk_exe dbeaver.exe")
 $^k:: {
     editor := WinActive("A")
