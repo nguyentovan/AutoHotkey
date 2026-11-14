@@ -3,4 +3,4 @@
 
 ; Gọi các file con nằm trong cùng thư mục
 #Include "*i ExplorerTab.ahk"
-#Include "SqlLogConvert.ahk"
+#Include "*i SqlLogConvert.ahk"
