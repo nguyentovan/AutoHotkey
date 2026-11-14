@@ -50,8 +50,7 @@ FormatSqlSelection(editor) {
 
         inputText := A_Clipboard
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
-        executable := A_ScriptDir "\Zea.SqlFormat.exe"
-        sql := FormatSqlText(inputText, executable)
+        sql := FormatSqlText(inputText, A_ScriptDir)
         if !WinActive(editor)
             return
 
@@ -85,7 +84,8 @@ FormatSqlSelection(editor) {
         MsgBox(errorMessage, "SQL Formatter", "Icon!")
 }
 
-FormatSqlText(inputText, executable) {
+FormatSqlText(inputText, directory) {
+    executable := directory "\Zea.SqlFormat.exe"
     if !FileExist(executable)
         throw Error("SQL Formatter not found: " executable)
 

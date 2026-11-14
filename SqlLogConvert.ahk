@@ -82,12 +82,12 @@ ClipboardHasWholeLine() {
 }
 
 ConvertAndFormatSqlText(log, directory) {
-    sql := ConvertSqlLogText(log, directory "\Zea.SqlLogConvert.exe")
-    formatter := directory "\Zea.SqlFormat.exe"
-    if !FileExist(formatter)
-        throw Error("SQL Formatter not found: " formatter)
-
-    return ConvertSqlLogText(sql, formatter)
+    global
+    local sql := ConvertSqlLogText(log, directory "\Zea.SqlLogConvert.exe")
+    local formatter := "FormatSqlText"
+    if IsSet(%formatter%)
+        sql := %formatter%.Call(sql, directory)
+    return sql
 }
 
 ConvertSqlLogText(log, executable) {
