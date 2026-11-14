@@ -1,5 +1,6 @@
 ﻿#Requires AutoHotkey v2.0
 
+desktopFolderOpen := 0
 WatchExplorerWindows()
 
 #e:: {
@@ -14,6 +15,7 @@ WatchExplorerWindows()
 
 ; Let Windows receive both clicks. Only look up the icon after a double-click.
 ~LButton:: {
+    global desktopFolderOpen
     static last := 0
     CoordMode("Mouse", "Screen")
     MouseGetPos(&x, &y, &window, &control, 2)
@@ -28,8 +30,10 @@ WatchExplorerWindows()
             && 2 * Abs(x - last.X) < SysGet(36) && 2 * Abs(y - last.Y) < SysGet(37) {
             last := 0
             path := DesktopFolderAt(control, x, y)
-            if path
+            if path {
+                desktopFolderOpen := {Path: path, Expires: A_TickCount + 5000}
                 SetTimer(FocusOpenedDesktopFolder.Bind(path), -150)
+            }
             return
         }
         last := {Control: control, X: x, Y: y, Tick: now}
@@ -79,10 +83,18 @@ WatchExplorerWindows() {
     explorer := "ahk_class CabinetWClass ahk_exe explorer.exe"
     known := Map()
     merge := 0
+    unusedTabs := []
     for hwnd in WinGetList(explorer)
         known[hwnd] := 0
 
     SetTimer(CheckWindows, 250)
+
+    CancelSourceMerge() {
+        known[merge.Source] := 0
+        merge.Deadline := Min(merge.Deadline, A_TickCount + 750)
+        unusedTabs.Push(merge)
+        merge := 0
+    }
 
     CheckWindows() {
         windows := WinGetList(explorer)
@@ -110,33 +122,84 @@ WatchExplorerWindows() {
         }
         known := current
 
-        if merge && !current.Get(merge.Source, 0)
+        ; A cancelled source must not keep other windows waiting for tab cleanup.
+        Loop unusedTabs.Length {
+            pending := unusedTabs.RemoveAt(1)
+            if A_TickCount >= pending.Deadline || !DllCall("IsWindowVisible", "Ptr", pending.Target)
+                continue
+            cleaned := false
+            try cleaned := CloseUnusedMergeTab(pending, true)
+            if !cleaned
+                unusedTabs.Push(pending)
+        }
+
+        if merge && !DllCall("IsWindowVisible", "Ptr", merge.Target) {
+            if current.Has(merge.Source)
+                current[merge.Source] := 0
             merge := 0
+        }
+
+        if merge && !current.Get(merge.Source, 0) {
+            cleaned := false
+            try cleaned := CloseUnusedMergeTab(merge)
+            if cleaned || A_TickCount >= merge.Deadline
+                merge := 0
+        }
 
         if !target
             return
+
+        ; Keep the next merge's tab snapshot stable until this target is done with cleanup.
+        for pending in unusedTabs {
+            if pending.Target = target && !merge
+                return
+        }
 
         for hwnd, deadline in current {
             if !deadline || (merge && merge.Source != hwnd)
                 continue
             try {
                 sourceTabs := GetExplorerTabs(hwnd)
-                if sourceTabs.Count != 1 || GetExplorerTabHandles(hwnd).Count != 1
+                handles := GetExplorerTabHandles(hwnd)
+                if merge && handles.Count > 1 {
+                    CancelSourceMerge()
+                    return
+                }
+                if sourceTabs.Count != 1 || handles.Count != 1
                     continue
                 for sourceTab, source in sourceTabs {
                     path := ReadyFolderPath(source)
+                    if merge && (merge.SourceTab != sourceTab || (path != "" && merge.Path != path)) {
+                        CancelSourceMerge()
+                        return
+                    }
                     if SubStr(path, 1, 2) != "::" && !DirExist(path)
                         continue
                     ; Preserve windows opened to reveal a selected file.
-                    if source.Document.SelectedItems().Count
+                    if source.Document.SelectedItems().Count {
+                        if merge {
+                            CancelSourceMerge()
+                            return
+                        }
                         continue
-                    if MoveExplorerFolder(hwnd, sourceTab, target, path, &merge) {
+                    }
+                    result := MoveExplorerFolder(hwnd, sourceTab, target, path, &merge)
+                    if merge && result = "source-changed" {
+                        CancelSourceMerge()
+                        return
+                    }
+                    if result {
                         current[hwnd] := 0
                         merge := 0
                     }
                 }
             } catch {
                 ; Explorer can still be loading or the user may have closed the window.
+            } finally {
+                if merge && (merge.Cancelled || !DllCall("IsWindowVisible", "Ptr", merge.Target)) {
+                    current[merge.Source] := 0
+                    merge := 0
+                }
             }
         }
     }
@@ -154,7 +217,7 @@ MoveExplorerFolder(sourceWindow, sourceTab, targetWindow, path, &merge) {
                 try location := ReadyFolderPath(tabs[tab])
             if location = path {
                 if SelectExplorerTab(targetWindow, tab, tabs[tab])
-                    return CloseMergedExplorerWindow(sourceWindow, sourceTab, targetWindow, path)
+                    return CloseMergedExplorerWindow(sourceWindow, sourceTab, targetWindow, tab, path)
                 return false
             }
             if !location
@@ -166,36 +229,29 @@ MoveExplorerFolder(sourceWindow, sourceTab, targetWindow, path, &merge) {
         control := ControlGetHwnd("ShellTabWindowClass1", targetWindow)
         ; A message timeout can still create a tab, so keep the request even if it throws.
         merge := {Deadline: A_TickCount + 4000, Source: sourceWindow, SourceTab: sourceTab, Target: targetWindow,
-            Path: path, Before: before, Input: input, Tab: 0, Navigating: false, Cancelled: false}
+            Path: path, Before: before, Input: input, Tab: 0, InitialPath: "", Navigating: false,
+            Cancelled: false, SourceCloseRequested: false, CreateConfirmed: false,
+            TargetWasActive: ExplorerForegroundRoot() = targetWindow}
         SendMessage(0x0111, 0xA21B, 0, , control, , , , 500)
+        merge.CreateConfirmed := true
+        Loop 8 {
+            if ExplorerInputChanged(targetWindow, input) || TrackMergeTab(merge, GetExplorerTabHandles(targetWindow))
+                break
+            Sleep(15)
+        }
         return false
     }
 
-    if merge.Cancelled || merge.SourceTab != sourceTab || merge.Path != path
+    if merge.Cancelled
         return false
     handles := GetExplorerTabHandles(merge.Target)
-    if ExplorerInputChanged(merge.Target, merge.Input) || handles.Count > merge.Before.Count + 1 {
+    if ExplorerInputChanged(merge.Target, merge.Input) {
         merge.Cancelled := true
         return false
     }
-    for tab in merge.Before {
-        if !handles.Has(tab) {
-            merge.Cancelled := true
-            return false
-        }
-    }
-    if handles.Count != merge.Before.Count + 1
+    if !TrackMergeTab(merge, handles)
         return false
-    for tab in handles {
-        if merge.Before.Has(tab)
-            continue
-        if merge.Tab && merge.Tab != tab {
-            merge.Cancelled := true
-            return false
-        }
-        merge.Tab := tab
-        break
-    }
+    merge.TargetWasActive := ExplorerForegroundRoot() = merge.Target
 
     destination := GetExplorerTabs(merge.Target).Get(merge.Tab, 0)
     if !destination
@@ -203,8 +259,10 @@ MoveExplorerFolder(sourceWindow, sourceTab, targetWindow, path, &merge) {
     location := ReadyFolderPath(destination)
     if !location
         return false
+    if !merge.InitialPath
+        merge.InitialPath := location
     if location = path
-        return CloseMergedExplorerWindow(sourceWindow, sourceTab, merge.Target, path)
+        return CloseMergedExplorerWindow(sourceWindow, sourceTab, merge.Target, merge.Tab, path, merge)
     if !merge.Navigating {
         if ExplorerInputChanged(merge.Target, merge.Input) || GetExplorerTabHandles(merge.Target).Count != handles.Count || ControlGetHwnd("ShellTabWindowClass1", merge.Target) != merge.Tab {
             merge.Cancelled := true
@@ -217,6 +275,63 @@ MoveExplorerFolder(sourceWindow, sourceTab, targetWindow, path, &merge) {
         merge.Navigating := true
     }
     return false
+}
+
+TrackMergeTab(merge, handles) {
+    for tab in merge.Before {
+        if !handles.Has(tab) {
+            merge.Cancelled := true
+            return false
+        }
+    }
+    if handles.Count > merge.Before.Count + 1 || (merge.Tab && !handles.Has(merge.Tab)) {
+        merge.Cancelled := true
+        return false
+    }
+    if handles.Count != merge.Before.Count + 1
+        return false
+    for tab in handles {
+        if !merge.Before.Has(tab) {
+            merge.Tab := tab
+            return true
+        }
+    }
+    return false
+}
+
+CloseUnusedMergeTab(merge, sourceChanged := false) {
+    if merge.Cancelled || merge.SourceCloseRequested || !merge.CreateConfirmed
+        || !merge.Tab || !WinExist(merge.Target)
+        return true
+    if sourceChanged && merge.HasOwnProp("CleanupSent")
+        return !GetExplorerTabHandles(merge.Target).Has(merge.Tab)
+    ; Closing the foreground source can make the target active without
+    ; any interaction with its tabs. Preserve it if it was already active.
+    input := LastExplorerInput()
+    if input = -1
+        return true
+    if input != merge.Input && (merge.TargetWasActive
+        || (sourceChanged ? (!merge.InitialPath || ExplorerForegroundRoot() != merge.Source)
+            : DllCall("IsWindowVisible", "Ptr", merge.Source)))
+        return true
+    handles := GetExplorerTabHandles(merge.Target)
+    if !TrackMergeTab(merge, handles)
+        return true
+    if ControlGetHwnd("ShellTabWindowClass1", merge.Target) != merge.Tab
+        return true
+    browser := GetExplorerTabs(merge.Target).Get(merge.Tab, 0)
+    if !browser || !(path := ReadyFolderPath(browser))
+        return false
+    if browser.Document.SelectedItems().Count || (merge.InitialPath && path != merge.InitialPath && path != merge.Path)
+        return true
+    if LastExplorerInput() != input || ControlGetHwnd("ShellTabWindowClass1", merge.Target) != merge.Tab
+        return false
+    ControlSend("{Ctrl down}w{Ctrl up}", merge.Tab)
+    if sourceChanged {
+        merge.CleanupSent := true
+        return !GetExplorerTabHandles(merge.Target).Has(merge.Tab)
+    }
+    return true
 }
 
 NavigateToShellFolder(browser, path) {
@@ -244,7 +359,7 @@ SelectExplorerTab(window, tab, browser) {
     if !name
         return false
     if WinGetMinMax(window) = -1
-        WinRestore(window)
+        return SelectExplorerTabByIndex(window, tab)
     items := GetExplorerTabItems(window)
     ComCall(3, items, "Int*", &count := 0)
     match := 0
@@ -255,7 +370,7 @@ SelectExplorerTab(window, tab, browser) {
             continue
         ; Identical tab labels can represent different folders.
         if match
-            return false
+            return SelectExplorerTabByIndex(window, tab)
         match := item
     }
     if !match
@@ -274,8 +389,36 @@ SelectExplorerTab(window, tab, browser) {
     return false
 }
 
+SelectExplorerTabByIndex(window, tab) {
+    original := ControlGetHwnd("ShellTabWindowClass1", window)
+    handles := GetExplorerTabHandles(window)
+    if !handles.Has(tab)
+        return false
+    originalIndex := 0
+    Loop handles.Count {
+        ; Explorer's tab index command uses visual order. Verify the selected HWND.
+        SendMessage(0x0111, 0xA221, A_Index, , window, , , , 200)
+        Loop 5 {
+            active := ControlGetHwnd("ShellTabWindowClass1", window)
+            if active = tab
+                return true
+            Sleep(20)
+        }
+        if active = original && !originalIndex
+            originalIndex := A_Index
+    }
+    if originalIndex
+        SendMessage(0x0111, 0xA221, originalIndex, , window, , , , 200)
+    return false
+}
+
 ExplorerInputChanged(window, input) {
-    return WinActive(window) && LastExplorerInput() != input
+    return ExplorerForegroundRoot() = window && LastExplorerInput() != input
+}
+
+ExplorerForegroundRoot(foreground := DllCall("GetForegroundWindow", "Ptr")) {
+    ; Explorer can report its tab HWND as foreground during a merge.
+    return DllCall("GetAncestor", "Ptr", foreground, "UInt", 2, "Ptr") ; GA_ROOT
 }
 
 LastExplorerInput() {
@@ -318,18 +461,63 @@ ExplorerElementName(item) {
     finally DllCall("OleAut32\SysFreeString", "Ptr", name)
 }
 
-CloseMergedExplorerWindow(sourceWindow, sourceTab, targetWindow, path) {
-    tabs := GetExplorerTabs(sourceWindow)
-    if tabs.Count = 1 && tabs.Has(sourceTab) && GetExplorerTabHandles(sourceWindow).Count = 1
-        && ReadyFolderPath(tabs[sourceTab]) = path
-        && !tabs[sourceTab].Document.SelectedItems().Count {
-        WinClose(sourceWindow)
-        if WinWaitClose(sourceWindow, , 0.2) {
+CloseMergedExplorerWindow(sourceWindow, sourceTab, targetWindow, targetTab, path, merge := 0) {
+    global desktopFolderOpen
+    if GetClosableExplorerSource(sourceWindow, sourceTab, path) {
+        input := LastExplorerInput()
+        foreground := DllCall("GetForegroundWindow", "Ptr")
+        foregroundRoot := ExplorerForegroundRoot(foreground)
+        open := desktopFolderOpen
+        fromDesktop := open && open.Path = path && A_TickCount <= open.Expires
+        desktopIsActive := foregroundRoot
+            && RegExMatch(WinGetClass(foregroundRoot), "^(Progman|WorkerW)$")
+            && WinGetProcessName(foregroundRoot) = "explorer.exe"
+        SplitPath(path, , &parent)
+        showTarget := foregroundRoot = sourceWindow
+            || (fromDesktop && foregroundRoot = targetWindow)
+            || (desktopIsActive && (fromDesktop || parent = A_Desktop || parent = A_DesktopCommon))
+        ; Transfer foreground while the source still exists and the destination is ready.
+        if showTarget && input != -1 && LastExplorerInput() = input
+            && DllCall("GetForegroundWindow", "Ptr") = foreground
             try WinActivate(targetWindow)
+        source := GetClosableExplorerSource(sourceWindow, sourceTab, path)
+        if !source
+            return "source-changed"
+        try {
+            destination := GetExplorerTabs(targetWindow).Get(targetTab, 0)
+            if !destination || ReadyFolderPath(destination) != path
+                return "cancelled"
+            if ReadyFolderPath(source) != path || source.Document.SelectedItems().Count
+                || GetExplorerTabHandles(sourceWindow).Count != 1
+                || ExplorerForegroundRoot(sourceTab) != sourceWindow
+                return "source-changed"
+            if ReadyFolderPath(destination) != path
+                return "cancelled"
+        } catch {
+            ; Explorer can disconnect a COM object while a tab is closing.
+            return "cancelled"
+        }
+        if !DllCall("IsWindowVisible", "Ptr", targetWindow)
+            || ExplorerForegroundRoot(targetTab) != targetWindow
+            return "cancelled"
+        WinClose(sourceWindow)
+        if merge
+            merge.SourceCloseRequested := true
+        if WinWaitClose(sourceWindow, , 0.2) {
+            if fromDesktop && desktopFolderOpen = open
+                desktopFolderOpen := 0
             return true
         }
     }
     return false
+}
+
+GetClosableExplorerSource(window, tab, path) {
+    tabs := GetExplorerTabs(window)
+    if tabs.Count != 1 || !tabs.Has(tab) || GetExplorerTabHandles(window).Count != 1
+        return 0
+    browser := tabs[tab]
+    return ReadyFolderPath(browser) = path && !browser.Document.SelectedItems().Count ? browser : 0
 }
 
 GetExplorerTabs(window) {
