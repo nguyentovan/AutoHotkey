@@ -1,0 +1,33 @@
+# AutoHotkey
+
+Bộ phím tắt AutoHotkey v2 để quản lý tab File Explorer, định dạng SQL và chuyển log SQL thành câu lệnh trong SQL Server Management Studio (SSMS) hoặc DBeaver.
+
+## Cài đặt và chạy
+
+1. Cài [AutoHotkey v2.0 trở lên](https://www.autohotkey.com/).
+2. Clone kho này hoặc chọn **Code → Download ZIP** trên GitHub rồi giải nén. Giữ các tệp `.ahk` và hai tệp `.exe` đi kèm trong cùng một thư mục.
+3. Bấm đúp vào [`Main.ahk`](Main.ahk). Đây là tệp khởi chạy. Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
+
+Tính năng quản lý tab cần Windows 11 với File Explorer có hỗ trợ tab. Các phím tắt SQL hoạt động trong cửa sổ SSMS hoặc DBeaver đang được chọn.
+
+## File Explorer
+
+- Nhấn **Win + E** để mở File Explorer. Nếu đã có cửa sổ Explorer, phím tắt đưa cửa sổ đó lên trước và mở tab mới.
+- Khi một thư mục mở trong cửa sổ Explorer mới có một tab, script thử gộp thư mục đó vào cửa sổ Explorer đang có. Nếu cửa sổ đích đã có tab cho cùng thư mục, script ưu tiên dùng lại tab đó. Cửa sổ mở để hiện một mục đang được chọn được giữ riêng.
+
+## SQL trong SSMS và DBeaver
+
+Bôi đen câu SQL hoặc một khối log trong trình soạn thảo. Giữ **Ctrl**, nhấn **K**, rồi nhanh tay nhấn **F** hoặc **Y** khi vẫn giữ **Ctrl**. Sau đó thả phím.
+
+| Phím tắt | Văn bản cần chọn | Kết quả |
+| --- | --- | --- |
+| **Ctrl + K**, **Ctrl + F** | Đoạn SQL | Thay vùng chọn bằng SQL đã định dạng. |
+| **Ctrl + K**, **Ctrl + Y** | Một khối log SQL có câu lệnh và thông tin tham số | Chuyển log thành SQL, định dạng kết quả rồi thay vào vùng chọn. |
+
+Cả hai lệnh chỉ thay văn bản trong trình soạn thảo. Bạn có thể dùng **Ctrl + Z** để hoàn tác.
+
+Nếu thấy thông báo thiếu công cụ, kiểm tra xem `Zea.SqlLogConvert.exe` và `Zea.SqlFormat.exe` có nằm cạnh `Main.ahk` không. Ở cấu hình mặc định, lệnh chuyển log dùng cả hai tệp, còn lệnh định dạng dùng `Zea.SqlFormat.exe`.
+
+## Tự chạy khi đăng nhập
+
+Nhấn **Win + R**, nhập `shell:startup` và nhấn **Enter**. Tạo shortcut trỏ tới `Main.ahk` trong thư mục vừa mở. Xóa shortcut đó nếu muốn tắt tự khởi động. [Hướng dẫn của Microsoft](https://support.microsoft.com/en-gb/windows/experience/startup-boot/configure-startup-applications-in-windows)
