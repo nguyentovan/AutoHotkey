@@ -17,12 +17,14 @@ Tính năng quản lý tab cần Windows 11 với File Explorer có hỗ trợ t
 
 ## SQL trong SSMS và DBeaver
 
-Bôi đen câu SQL hoặc một khối log trong trình soạn thảo. Giữ **Ctrl**, nhấn **K**, rồi nhanh tay nhấn **F** hoặc **Y** khi vẫn giữ **Ctrl**. Sau đó thả phím.
+Bôi đen câu SQL hoặc một khối log trong trình soạn thảo. Giữ **Ctrl**, nhấn **K**, rồi nhanh tay nhấn **G** hoặc **Y** khi vẫn giữ **Ctrl**. Sau đó thả phím.
 
 | Phím tắt | Văn bản cần chọn | Kết quả |
 | --- | --- | --- |
-| **Ctrl + K**, **Ctrl + F** | Đoạn SQL | Thay vùng chọn bằng SQL đã định dạng. |
-| **Ctrl + K**, **Ctrl + Y** | Một khối log SQL có câu lệnh và thông tin tham số | Chuyển log thành SQL, định dạng kết quả rồi thay vào vùng chọn. |
+| **Ctrl + K**, **Ctrl + Y** | Đoạn SQL | Thay vùng chọn bằng SQL đã định dạng. |
+| **Ctrl + K**, **Ctrl + G** | Một khối log SQL có câu lệnh và thông tin tham số | Chuyển log thành SQL, định dạng kết quả rồi thay vào vùng chọn. |
+
+SSMS dùng T-SQL. Trong DBeaver, cả hai phím tắt lấy dialect từ mục **Type** của tab SQL đang chọn. Tích hợp DBeaver hiện nhận diện tab SQL Server và PostgreSQL. Nếu thiếu thông tin kết nối hoặc dialect chưa được hỗ trợ, hotkey báo lỗi và giữ nguyên vùng chọn.
 
 Cả hai lệnh chỉ thay văn bản trong trình soạn thảo. Bạn có thể dùng **Ctrl + Z** để hoàn tác.
 

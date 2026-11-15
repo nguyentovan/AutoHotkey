@@ -9,13 +9,13 @@ $^k:: {
     chord := InputHook("V T1.5")
     chord.KeyOpt("{All}", "E")
     chord.KeyOpt("{LControl}{RControl}", "-E +N")
-    chord.KeyOpt("y", "+S")
+    chord.KeyOpt("g", "+S")
     chord.OnKeyUp := (hook, vk, sc) => hook.Stop()
     chord.Start()
     chord.Wait()
-    if chord.EndKey != "Y" || !InStr(chord.EndMods, "^")
+    if chord.EndKey != "G" || !InStr(chord.EndMods, "^")
         return
-    if !KeyWait("y", "T2")
+    if !KeyWait("g", "T2")
         return
     KeyWait("Ctrl", "T2")
     if !GetKeyState("Ctrl", "P") && WinActive(editor)
@@ -27,6 +27,9 @@ ConvertSqlSelection(editor) {
     originalClipboard := ClipboardAll()
     errorMessage := ""
     try {
+        target := GetLogFormatTarget(editor)
+        if !WinActive(editor)
+            return
         A_Clipboard := ""
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
         Send("^c")
@@ -38,7 +41,7 @@ ConvertSqlSelection(editor) {
 
         log := A_Clipboard
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
-        sql := ConvertAndFormatSqlText(log, A_ScriptDir)
+        sql := ConvertAndFormatSqlText(log, A_ScriptDir, target ? target.dialect : "")
         if !WinActive(editor)
             return
 
@@ -56,6 +59,9 @@ ConvertSqlSelection(editor) {
         selection := A_Clipboard
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
         if selection !== log || !WinActive(editor)
+            return
+
+        if target && !IsSameSqlFormatTarget(editor, target, clipboardSequence)
             return
 
         A_Clipboard := sql
@@ -81,16 +87,24 @@ ClipboardHasWholeLine() {
     return false
 }
 
-ConvertAndFormatSqlText(log, directory) {
+GetLogFormatTarget(editor) {
+    global
+    local formatter := "FormatSqlText"
+    if IsSet(%formatter%)
+        return GetSqlFormatTarget(editor)
+    return false
+}
+
+ConvertAndFormatSqlText(log, directory, dialect) {
     global
     local sql := ConvertSqlLogText(log, directory "\Zea.SqlLogConvert.exe")
     local formatter := "FormatSqlText"
-    if IsSet(%formatter%)
-        sql := %formatter%.Call(sql, directory)
+    if dialect != "" && IsSet(%formatter%)
+        sql := %formatter%.Call(sql, directory, dialect)
     return sql
 }
 
-ConvertSqlLogText(log, executable) {
+ConvertSqlLogText(log, executable, arguments := "") {
     if !FileExist(executable)
         throw Error("Converter not found: " executable)
 
@@ -113,6 +127,8 @@ ConvertSqlLogText(log, executable) {
         NumPut("Ptr", inputRead, "Ptr", outputWrite, "Ptr", outputWrite, startup, startup.Size - 3 * A_PtrSize)
         processInfo := Buffer(2 * A_PtrSize + 8, 0)
         command := '"' executable '"'
+        if arguments != ""
+            command .= " " arguments
         if !DllCall("CreateProcessW", "Str", executable, "Str", command, "Ptr", 0, "Ptr", 0,
             "Int", true, "UInt", 0x08000000, "Ptr", 0, "Ptr", 0, "Ptr", startup, "Ptr", processInfo)
             throw OSError()

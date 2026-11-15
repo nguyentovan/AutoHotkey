@@ -10,19 +10,19 @@ $^k:: {
     chord := InputHook("V T1.5")
     chord.KeyOpt("{All}", "E")
     chord.KeyOpt("{LControl}{RControl}", "-E +N")
-    chord.KeyOpt("yf", "+S")
+    chord.KeyOpt("gy", "+S")
     chord.OnKeyUp := (hook, vk, sc) => hook.Stop()
     chord.Start()
     chord.Wait()
     key := chord.EndKey
-    if (key != "Y" && key != "F") || !InStr(chord.EndMods, "^")
+    if (key != "G" && key != "Y") || !InStr(chord.EndMods, "^")
         return
     if !KeyWait(key, "T2")
         return
     KeyWait("Ctrl", "T2")
     if GetKeyState("Ctrl", "P") || !WinActive(editor)
         return
-    if key = "Y"
+    if key = "G"
         GetSqlConvertFunction("ConvertSqlSelection").Call(editor)
     else
         FormatSqlSelection(editor)
@@ -39,6 +39,9 @@ FormatSqlSelection(editor) {
     errorMessage := ""
     clipboardHasWholeLine := GetSqlConvertFunction("ClipboardHasWholeLine")
     try {
+        target := GetSqlFormatTarget(editor)
+        if !WinActive(editor)
+            return
         A_Clipboard := ""
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
         Send("^c")
@@ -50,7 +53,7 @@ FormatSqlSelection(editor) {
 
         inputText := A_Clipboard
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
-        sql := FormatSqlText(inputText, A_ScriptDir)
+        sql := FormatSqlText(inputText, A_ScriptDir, target.dialect)
         if !WinActive(editor)
             return
 
@@ -70,6 +73,9 @@ FormatSqlSelection(editor) {
         if selection !== inputText || !WinActive(editor)
             return
 
+        if target && !IsSameSqlFormatTarget(editor, target, clipboardSequence)
+            return
+
         A_Clipboard := sql
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
         Send("^v")
@@ -84,15 +90,84 @@ FormatSqlSelection(editor) {
         MsgBox(errorMessage, "SQL Formatter", "Icon!")
 }
 
-FormatSqlText(inputText, directory) {
+FormatSqlText(inputText, directory, dialect) {
     executable := directory "\Zea.SqlFormat.exe"
     if !FileExist(executable)
         throw Error("SQL Formatter not found: " executable)
 
-    return GetSqlConvertFunction("ConvertSqlLogText").Call(inputText, executable)
+    return GetSqlConvertFunction("ConvertSqlLogText").Call(inputText, executable, "--dialect " dialect)
 }
 
 GetSqlConvertFunction(name) {
     global
     return IsSet(%name%) ? %name% : false
+}
+
+GetSqlFormatTarget(editor) {
+    if WinGetProcessName(editor) = "ssms.exe"
+        return {dialect: "tsql", control: 0, tab: 0, name: ""}
+
+    tab := GetDBeaverSqlTab(editor)
+    return {dialect: DBeaverSqlDialect(tab.helpText), control: tab.control, tab: tab.id, name: tab.name}
+}
+
+GetDBeaverSqlTab(editor) {
+    iid := Buffer(16)
+    DllCall("ole32\CLSIDFromString", "WStr", "{618736E0-3C3D-11CF-810C-00AA00389B71}", "Ptr", iid)
+    control := ControlGetFocus(editor)
+    while control && control != editor {
+        if RegExMatch(WinGetClass(control), "^SWT_Window\d+$") {
+            tab := ReadDBeaverSqlTab(control, iid)
+            if tab
+                return tab
+        }
+        control := DllCall("GetParent", "Ptr", control, "Ptr")
+    }
+    throw Error("Could not identify a unique active SQL tab in DBeaver. Focus the SQL editor and try again.")
+}
+
+ReadDBeaverSqlTab(control, iid) {
+    ; OBJID_CLIENT exposes the SWT tab list via IAccessible.
+    hr := DllCall("oleacc\AccessibleObjectFromWindow", "Ptr", control, "UInt", 0xFFFFFFFC,
+        "Ptr", iid, "Ptr*", &pointer := 0, "Int")
+    if hr != 0 || !pointer
+        return false
+
+    tabs := ComValue(9, pointer, 1)
+    try {
+        if tabs.accRole(0) != 0x3C ; ROLE_SYSTEM_PAGETABLIST
+            return false
+        Loop tabs.accChildCount {
+            id := A_Index
+            if tabs.accRole(id) != 0x25 || !(tabs.accState(id) & 0x2) ; PAGETAB and SELECTED
+                continue
+            helpText := tabs.accHelp(id)
+            if RegExMatch(helpText, "m)^Script:")
+                return {control: control, id: id, name: tabs.accName(id), helpText: helpText}
+        }
+    }
+    return false
+}
+DBeaverSqlDialect(helpText) {
+    if !RegExMatch(helpText, "m)^Type:[ \t]*([^\r\n]+)", &type)
+        throw Error("The active DBeaver SQL tab has no database type.")
+    switch Trim(type[1]), false {
+        case "MS SQL Server / SQL Server", "SQL Server", "Microsoft SQL Server":
+            return "tsql"
+        case "PostgreSQL", "PostgreSQL / PostgreSQL":
+            return "postgresql"
+        default:
+            throw Error("Unsupported DBeaver database type: " Trim(type[1]))
+    }
+}
+
+IsSameSqlFormatTarget(editor, target, clipboardSequence) {
+    if !WinActive(editor)
+        return false
+    try current := GetSqlFormatTarget(editor)
+    catch
+        return false
+    return WinActive(editor) && current.control = target.control && current.tab = target.tab
+        && current.name == target.name && current.dialect = target.dialect
+        && DllCall("GetClipboardSequenceNumber", "UInt") = clipboardSequence
 }
