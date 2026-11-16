@@ -5,8 +5,9 @@ Bộ phím tắt AutoHotkey v2 để quản lý tab File Explorer, định dạn
 ## Cài đặt và chạy
 
 1. Cài [AutoHotkey v2.0 trở lên](https://www.autohotkey.com/).
-2. Clone kho này hoặc chọn **Code → Download ZIP** trên GitHub rồi giải nén. Giữ các tệp `.ahk` và hai tệp `.exe` đi kèm trong cùng một thư mục.
-3. Bấm đúp vào [`Main.ahk`](Main.ahk). Đây là tệp khởi chạy. Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
+2. Để dùng các phím tắt SQL, cài [.NET 10 Runtime (Windows x64)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Cả hai công cụ SQL cần runtime này. Formatter đã có sẵn Python và SQLFluff.
+3. Clone kho này hoặc chọn **Code → Download ZIP** trên GitHub rồi giải nén. Giữ các tệp `.ahk` và hai tệp `.exe` đi kèm trong cùng một thư mục.
+4. Bấm đúp vào [`Main.ahk`](Main.ahk). Đây là tệp khởi chạy. Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
 
 Tính năng quản lý tab cần Windows 11 với File Explorer có hỗ trợ tab. Các phím tắt SQL hoạt động trong cửa sổ SSMS hoặc DBeaver đang được chọn.
 
