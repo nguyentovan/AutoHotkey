@@ -151,13 +151,64 @@ ReadDBeaverSqlTab(control, iid) {
 DBeaverSqlDialect(helpText) {
     if !RegExMatch(helpText, "m)^Type:[ \t]*([^\r\n]+)", &type)
         throw Error("The active DBeaver SQL tab has no database type.")
-    switch Trim(type[1]), false {
-        case "MS SQL Server / SQL Server", "SQL Server", "Microsoft SQL Server":
+    databaseType := Trim(type[1])
+    ; DBeaver displays either the driver name or "provider / driver".
+    driver := RegExReplace(databaseType, "^.* / ")
+    switch driver, false {
+        case "SQL Server", "MS SQL Server", "Microsoft SQL Server", "Azure SQL Server",
+            "SQL Server (Deprecated)", "Azure SQL Server (Deprecated)",
+            "SQL Server (Old driver, MS)", "SQL Server (Old driver, jTDS)":
             return "tsql"
-        case "PostgreSQL", "PostgreSQL / PostgreSQL":
+        case "PostgreSQL", "PostgreSQL (Old)", "Google Cloud SQL - PostgreSQL":
             return "postgresql"
+        case "MySQL", "MySQL 5 (Legacy)", "MySQL (Old)":
+            return "mysql"
+        case "MariaDB":
+            return "mariadb"
+        case "Oracle":
+            return "oracle"
+        case "SQLite":
+            return "sqlite"
+        case "DuckDB":
+            return "duckdb"
+        case "Athena", "Athena (Legacy)":
+            return "athena"
+        case "BigQuery", "BigQuery (Legacy)", "Google BigQuery":
+            return "bigquery"
+        case "ClickHouse", "ClickHouse (Legacy)":
+            return "clickhouse"
+        case "Databricks":
+            return "databricks"
+        case "Db2", "Db2 for LUW", "Db2 for LUW (Old 8.x)":
+            return "db2"
+        case "Apache Doris":
+            return "doris"
+        case "Exasol":
+            return "exasol"
+        case "Greenplum":
+            return "greenplum"
+        case "Apache Hive", "Apache Hive 2", "Apache Hive 4+":
+            return "hive"
+        case "Cloudera Impala":
+            return "impala"
+        case "Materialize":
+            return "materialize"
+        case "Redshift":
+            return "redshift"
+        case "Snowflake":
+            return "snowflake"
+        case "Apache Spark":
+            return "sparksql"
+        case "StarRocks":
+            return "starrocks"
+        case "Teradata":
+            return "teradata"
+        case "Trino":
+            return "trino"
+        case "Vertica":
+            return "vertica"
         default:
-            throw Error("Unsupported DBeaver database type: " Trim(type[1]))
+            throw Error("Unsupported DBeaver database type: " databaseType)
     }
 }
 

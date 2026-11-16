@@ -25,7 +25,7 @@ Bôi đen câu SQL hoặc một khối log trong trình soạn thảo. Giữ **C
 | **Ctrl + K**, **Ctrl + Y** | Đoạn SQL | Thay vùng chọn bằng SQL đã định dạng. |
 | **Ctrl + K**, **Ctrl + G** | Một khối log SQL có câu lệnh và thông tin tham số | Chuyển log thành SQL, định dạng kết quả rồi thay vào vùng chọn. |
 
-SSMS dùng T-SQL. Trong DBeaver, cả hai phím tắt lấy dialect từ mục **Type** của tab SQL đang chọn. Tích hợp DBeaver hiện nhận diện tab SQL Server và PostgreSQL. Nếu thiếu thông tin kết nối hoặc dialect chưa được hỗ trợ, hotkey báo lỗi và giữ nguyên vùng chọn.
+SSMS dùng T-SQL. Trong DBeaver, cả hai phím tắt lấy dialect từ mục **Type** của tab SQL đang chọn. Tích hợp DBeaver nhận diện SQL Server, PostgreSQL, MySQL, MariaDB, Oracle, SQLite, DuckDB, Athena, BigQuery, ClickHouse, Databricks, Db2 LUW, Doris, Exasol, Greenplum, Hive, Impala, Materialize, Redshift, Snowflake, Spark SQL, StarRocks, Teradata, Trino và Vertica. Nếu thiếu thông tin kết nối hoặc dialect chưa được hỗ trợ, hotkey báo lỗi và giữ nguyên vùng chọn.
 
 Cả hai lệnh chỉ thay văn bản trong trình soạn thảo. Bạn có thể dùng **Ctrl + Z** để hoàn tác.
 
