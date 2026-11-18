@@ -127,6 +127,12 @@ GetDBeaverSqlTab(editor) {
 }
 
 ReadDBeaverSqlTab(control, iid) {
+    ; The returned COM object can use code in oleacc after DllCall returns.
+    static oleacc := DllCall("LoadLibraryExW", "WStr", "oleacc.dll", "Ptr", 0,
+        "UInt", 0x800, "Ptr") ; LOAD_LIBRARY_SEARCH_SYSTEM32
+    if !oleacc
+        return false
+
     ; OBJID_CLIENT exposes the SWT tab list via IAccessible.
     hr := DllCall("oleacc\AccessibleObjectFromWindow", "Ptr", control, "UInt", 0xFFFFFFFC,
         "Ptr", iid, "Ptr*", &pointer := 0, "Int")
