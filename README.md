@@ -4,12 +4,16 @@ Bộ phím tắt AutoHotkey v2 để quản lý tab File Explorer, định dạn
 
 ## Cài đặt và chạy
 
-1. Cài [AutoHotkey v2.0 trở lên](https://www.autohotkey.com/).
-2. Để dùng các phím tắt SQL, cài [.NET 10 Runtime (Windows x64)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Cả hai công cụ SQL cần runtime này. Formatter đã có sẵn Python và SQLFluff.
-3. Clone kho này hoặc chọn **Code → Download ZIP** trên GitHub rồi giải nén. Giữ các tệp `.ahk` và hai tệp `.exe` đi kèm trong cùng một thư mục.
-4. Bấm đúp vào [`Main.ahk`](Main.ahk). Đây là tệp khởi chạy. Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
+1. Clone kho này hoặc chọn **Code → Download ZIP** trên GitHub rồi giải nén toàn bộ.
+2. Nếu thư mục `runtime\` chưa có `AutoHotkey64.exe`, tải [ZIP portable AutoHotkey v2.0.31](https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.31/AutoHotkey_2.0.31.zip) và giải nén `AutoHotkey64.exe` vào đó. Bản portable dành cho Windows x64 và chạy trực tiếp.
+3. Bấm đúp vào [RunMainAhk.cmd](RunMainAhk.cmd). Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
+4. Để dùng các phím tắt SQL, cài [.NET 10 Runtime (Windows x64)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Cả hai công cụ SQL cần runtime này. Formatter đã có sẵn Python và SQLFluff.
 
 Tính năng quản lý tab cần Windows 11 với File Explorer có hỗ trợ tab. Các phím tắt SQL hoạt động trong cửa sổ SSMS hoặc DBeaver đang được chọn.
+
+### Cập nhật AutoHotkey portable
+
+Để cập nhật, thoát AutoHotkey từ khay hệ thống, tải gói `AutoHotkey_<phiên-bản>.zip` trong **Assets** của bản mới rồi chép đè `runtime\AutoHotkey64.exe` bằng tệp cùng tên trong ZIP. Mở lại `RunMainAhk.cmd` để chạy bản mới. Shortcut trỏ tới `RunMainAhk.cmd` vẫn dùng được. [Các bản phát hành AutoHotkey v2](https://github.com/AutoHotkey/AutoHotkey/releases)
 
 ## File Explorer
 
@@ -87,4 +91,4 @@ Hai tệp `Zea.SqlFormat.exe` và `Zea.SqlLogConvert.exe` được build từ d�
 
 ## Tự chạy khi đăng nhập
 
-Nhấn **Win + R**, nhập `shell:startup` và nhấn **Enter**. Tạo shortcut trỏ tới `Main.ahk` trong thư mục vừa mở. Xóa shortcut đó nếu muốn tắt tự khởi động. [Hướng dẫn của Microsoft](https://support.microsoft.com/en-gb/windows/experience/startup-boot/configure-startup-applications-in-windows)
+Nhấn **Win + R**, nhập `shell:startup` và nhấn **Enter**. Tạo shortcut trỏ tới `RunMainAhk.cmd` trong thư mục vừa mở. Xóa shortcut đó nếu muốn tắt tự khởi động. [Hướng dẫn của Microsoft](https://support.microsoft.com/en-gb/windows/experience/startup-boot/configure-startup-applications-in-windows)
