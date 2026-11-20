@@ -88,7 +88,7 @@ FormatSqlSelection(editor) {
             A_Clipboard := originalClipboard
     }
     if errorMessage != ""
-        MsgBox(errorMessage, "SQL Formatter", "Icon!")
+        MsgBox(errorMessage, "SQL Formatter", "Icon!" (WinExist(editor) ? " Owner" editor : ""))
 }
 
 FormatSqlText(inputText, directory, dialect) {

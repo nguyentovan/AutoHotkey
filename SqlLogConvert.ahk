@@ -76,7 +76,7 @@ ConvertSqlSelection(editor) {
             A_Clipboard := originalClipboard
     }
     if errorMessage != ""
-        MsgBox(errorMessage, "SQL Log Converter", "Icon!")
+        MsgBox(errorMessage, "SQL Log Converter", "Icon!" (WinExist(editor) ? " Owner" editor : ""))
 }
 
 ClipboardHasWholeLine() {
