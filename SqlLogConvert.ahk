@@ -41,7 +41,8 @@ ConvertSqlSelection(editor) {
 
         log := A_Clipboard
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
-        sql := ConvertAndFormatSqlText(log, A_ScriptDir, target ? target.dialect : "")
+        sql := RunSqlWithProgress(editor, "Converting SQL log...",
+            ConvertAndFormatSqlText.Bind(log, A_ScriptDir, target ? target.dialect : ""))
         if !WinActive(editor)
             return
 
@@ -93,6 +94,36 @@ GetLogFormatTarget(editor) {
     if IsSet(%formatter%)
         return GetSqlFormatTarget(editor)
     return false
+}
+
+RunSqlWithProgress(editor, message, action) {
+    window := Gui("+Owner" editor " +ToolWindow -Caption +E0x08000000", "SQL Tools") ; WS_EX_NOACTIVATE
+    try {
+        window.AddText("w250", message)
+        progress := window.AddProgress("w250 h10 +0x8") ; PBS_MARQUEE
+        window.Show("AutoSize Hide")
+
+        ; Use the editor's monitor work area and screen coordinates, which can be negative.
+        monitor := DllCall("MonitorFromWindow", "Ptr", editor, "UInt", 2, "Ptr") ; MONITOR_DEFAULTTONEAREST
+        monitorInfo := Buffer(40) ; MONITORINFO
+        NumPut("UInt", monitorInfo.Size, monitorInfo)
+        windowRect := Buffer(16)
+        position := "Center"
+        if monitor && DllCall("GetMonitorInfoW", "Ptr", monitor, "Ptr", monitorInfo)
+            && DllCall("GetWindowRect", "Ptr", window.Hwnd, "Ptr", windowRect) {
+            width := NumGet(windowRect, 8, "Int") - NumGet(windowRect, 0, "Int")
+            height := NumGet(windowRect, 12, "Int") - NumGet(windowRect, 4, "Int")
+            x := (NumGet(monitorInfo, 20, "Int") + NumGet(monitorInfo, 28, "Int") - width) // 2
+            y := (NumGet(monitorInfo, 24, "Int") + NumGet(monitorInfo, 32, "Int") - height) // 2
+            position := "x" x " y" y
+        }
+        window.Show("NoActivate " position)
+        SendMessage(0x40A, 1, 0, progress.Hwnd) ; PBM_SETMARQUEE
+        Sleep(-1)
+        return action.Call()
+    } finally {
+        window.Destroy()
+    }
 }
 
 ConvertAndFormatSqlText(log, directory, dialect) {
@@ -148,19 +179,34 @@ ConvertSqlLogText(log, executable, arguments := "") {
         output := Buffer(4096)
         bytes := 0
         loop {
-            if bytes = output.Size
-                output.Size *= 2
-            if !DllCall("ReadFile", "Ptr", outputRead, "Ptr", output.Ptr + bytes, "UInt", output.Size - bytes,
-                "UInt*", &read := 0, "Ptr", 0) {
+            ; Keep the progress window responsive while the tool prepares output.
+            if !DllCall("PeekNamedPipe", "Ptr", outputRead, "Ptr", 0, "UInt", 0,
+                "Ptr", 0, "UInt*", &available := 0, "Ptr", 0) {
                 if A_LastError != 109 ; ERROR_BROKEN_PIPE signals EOF.
                     throw OSError()
                 break
             }
+            if !available {
+                Sleep(25)
+                continue
+            }
+            if bytes = output.Size
+                output.Size *= 2
+            if !DllCall("ReadFile", "Ptr", outputRead, "Ptr", output.Ptr + bytes,
+                "UInt", Min(available, output.Size - bytes), "UInt*", &read := 0, "Ptr", 0)
+                throw OSError()
             bytes += read
         }
 
-        if DllCall("WaitForSingleObject", "Ptr", process, "UInt", 5000, "UInt") != 0
-            throw Error("The converter did not exit.")
+        deadline := DllCall("GetTickCount64", "UInt64") + 5000
+        loop {
+            waitResult := DllCall("WaitForSingleObject", "Ptr", process, "UInt", 0, "UInt")
+            if waitResult = 0
+                break
+            if waitResult != 258 || DllCall("GetTickCount64", "UInt64") >= deadline ; WAIT_TIMEOUT
+                throw Error("The converter did not exit.")
+            Sleep(25)
+        }
         if !DllCall("GetExitCodeProcess", "Ptr", process, "UInt*", &exitCode := 0)
             throw OSError()
         result := bytes ? RTrim(StrGet(output.Ptr, bytes, "UTF-8"), Chr(13) Chr(10)) : ""

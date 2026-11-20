@@ -53,7 +53,8 @@ FormatSqlSelection(editor) {
 
         inputText := A_Clipboard
         clipboardSequence := DllCall("GetClipboardSequenceNumber", "UInt")
-        sql := FormatSqlText(inputText, A_ScriptDir, target.dialect)
+        sql := GetSqlConvertFunction("RunSqlWithProgress").Call(editor, "Formatting SQL...",
+            FormatSqlText.Bind(inputText, A_ScriptDir, target.dialect))
         if !WinActive(editor)
             return
 
