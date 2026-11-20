@@ -18,7 +18,7 @@ Tính năng quản lý tab cần Windows 11 với File Explorer có hỗ trợ t
 
 ### Cập nhật bộ phím tắt qua GitHub Releases
 
-Khi mở `RunMainAhk.cmd`, launcher kiểm tra release chính thức mới nhất. Nếu không có release hoặc GitHub không truy cập được, launcher vẫn mở bộ phím tắt hiện tại.
+Khi mở `RunMainAhk.cmd`, launcher kiểm tra release chính thức mới nhất trước khi xử lý runtime. Nếu GitHub không truy cập được và runtime đã có sẵn, launcher vẫn mở bộ phím tắt hiện tại.
 
 - Với bản clone Git, launcher so commit của tag release với `HEAD`. Nếu có thể cập nhật fast-forward và các tệp Git theo dõi đang sạch, launcher hỏi trước khi cập nhật. Nhánh đã phân kỳ hoặc có chỉnh sửa cục bộ cần xử lý bằng Git.
 - Với bản giải nén, launcher so SHA-256 của các tệp trong gói. Nếu có khác biệt, launcher hỏi trước khi tự tải và giải nén bản mới. Hãy từ chối nếu muốn giữ những chỉnh sửa cục bộ. Tệp `runtime\AutoHotkey64.exe` cập nhật riêng.

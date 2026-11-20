@@ -1,12 +1,4 @@
 @echo off
-if not exist "%~dp0runtime\AutoHotkey64.exe" (
-    "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0CheckRelease.ps1" -EnsureRuntime
-)
-if not exist "%~dp0runtime\AutoHotkey64.exe" (
-    echo AutoHotkey64.exe could not be downloaded. Check your connection and try again.
-    pause
-    exit /b 1
-)
 (
     if exist "%~dp0CheckRelease.ps1" (
         "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0CheckRelease.ps1"
@@ -15,6 +7,14 @@ if not exist "%~dp0runtime\AutoHotkey64.exe" (
             pause
             exit /b 2
         )
+    )
+    if not exist "%~dp0runtime\AutoHotkey64.exe" (
+        "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0CheckRelease.ps1" -EnsureRuntime
+    )
+    if not exist "%~dp0runtime\AutoHotkey64.exe" (
+        echo AutoHotkey64.exe could not be downloaded. Check your connection and try again.
+        pause
+        exit /b 1
     )
     start "" "%~dp0runtime\AutoHotkey64.exe" "%~dp0Main.ahk"
 )

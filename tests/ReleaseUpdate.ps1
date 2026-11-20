@@ -206,7 +206,32 @@ try {
     }
     Assert-Equal 1 $script:runtimeRequests 'Missing runtime fetched from the official release'
     Assert-Equal $false (Test-Path -LiteralPath (Join-Path $bootstrapRoot 'runtime\AutoHotkey64.exe')) 'Invalid runtime was never installed'
-    Write-Output 'PASS: Git fast-forward, ZIP update and rollback, runtime bootstrap guards.'
+
+    $launcherPath = Join-Path $bootstrapRoot 'RunMainAhk.cmd'
+    Copy-Item -LiteralPath (Join-Path $sourceRoot 'RunMainAhk.cmd') -Destination $launcherPath
+    @'
+param([switch]$EnsureRuntime)
+$logPath = Join-Path $PSScriptRoot 'startup-order.txt'
+if ($EnsureRuntime) {
+    Add-Content -LiteralPath $logPath -Value 'old bootstrap'
+    exit 1
+}
+Add-Content -LiteralPath $logPath -Value 'check release'
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'updated.ps1') -Destination $PSCommandPath -Force
+'@ | Set-Content -LiteralPath (Join-Path $bootstrapRoot 'CheckRelease.ps1') -Encoding ascii
+    @'
+param([switch]$EnsureRuntime)
+if (!$EnsureRuntime) { throw 'Release check was unexpectedly repeated.' }
+Add-Content -LiteralPath (Join-Path $PSScriptRoot 'startup-order.txt') -Value 'new bootstrap'
+exit 1
+'@ | Set-Content -LiteralPath (Join-Path $bootstrapRoot 'updated.ps1') -Encoding ascii
+
+    $launcherCommand = 'call "' + $launcherPath + '" <nul'
+    & $env:ComSpec /d /c $launcherCommand | Out-Null
+    Assert-Equal 1 $LASTEXITCODE 'Fixture still lacks a runnable runtime'
+    $startupSteps = (Get-Content -LiteralPath (Join-Path $bootstrapRoot 'startup-order.txt')) -join ', '
+    Assert-Equal 'check release, new bootstrap' $startupSteps 'Check release before bootstrapping with the updated code'
+    Write-Output 'PASS: Git and ZIP updates, runtime bootstrap guards, and launcher startup order.'
 } finally {
     $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
     $resolved = (Resolve-Path -LiteralPath $root).Path
