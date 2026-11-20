@@ -7,13 +7,15 @@ desktopFolderOpen := 0
 WatchExplorerWindows()
 
 #e:: {
-    if explorer := WinExist("ahk_class CabinetWClass ahk_exe explorer.exe") {
+    for explorer in WinGetList("ahk_class CabinetWClass ahk_exe explorer.exe") {
+        if !HasReadyExplorerTab(explorer)
+            continue
         WinActivate(explorer)
         if WinWaitActive(explorer, , 1)
             Send("^t")
-    } else {
-        Run("explorer.exe")
+        return
     }
+    Run("explorer.exe")
 }
 
 ; Let Windows receive both clicks. Only look up the icon after a double-click.
@@ -103,17 +105,16 @@ WatchExplorerWindows() {
         windows := WinGetList(explorer)
         current := Map()
         target := 0
-        for hwnd in windows {
-            if known.Has(hwnd) && !known[hwnd] {
-                target := hwnd
-                break
+        if windows.Length = 1 {
+            target := windows[1]
+        } else {
+            for hwnd in windows {
+                if !known.Has(hwnd) || known[hwnd] {
+                    target := FindExplorerTarget(windows, known)
+                    break
+                }
             }
         }
-
-        ; WinGetList lists the newest foreground windows first. If none were
-        ; known, keep the bottommost window so there is still a destination.
-        if !target && windows.Length
-            target := windows[-1]
 
         for hwnd in windows {
             deadline := known.Get(hwnd, A_TickCount + 3000)
@@ -176,7 +177,7 @@ WatchExplorerWindows() {
                         CancelSourceMerge()
                         return
                     }
-                    if SubStr(path, 1, 2) != "::" && !DirExist(path)
+                    if !path || (SubStr(path, 1, 2) != "::" && !DirExist(path))
                         continue
                     ; Preserve windows opened to reveal a selected file.
                     if source.Document.SelectedItems().Count {
@@ -206,6 +207,19 @@ WatchExplorerWindows() {
             }
         }
     }
+}
+
+FindExplorerTarget(windows, known) {
+    fallback := 0
+    for hwnd in windows {
+        if !HasReadyExplorerTab(hwnd)
+            continue
+        if known.Has(hwnd) && !known[hwnd]
+            return hwnd
+        ; If none were known, keep the bottommost eligible window.
+        fallback := hwnd
+    }
+    return fallback
 }
 
 MoveExplorerFolder(sourceWindow, sourceTab, targetWindow, path, &merge) {
@@ -245,7 +259,7 @@ MoveExplorerFolder(sourceWindow, sourceTab, targetWindow, path, &merge) {
         return false
     }
 
-    if merge.Cancelled
+    if merge.Cancelled || !HasReadyExplorerTab(merge.Target)
         return false
     handles := GetExplorerTabHandles(merge.Target)
     if ExplorerInputChanged(merge.Target, merge.Input) {
@@ -549,8 +563,22 @@ GetExplorerTabHandles(window) {
     return handles
 }
 
+HasReadyExplorerTab(window) {
+    try {
+        tab := ControlGetHwnd("ShellTabWindowClass1", window)
+        browser := GetExplorerTabs(window).Get(tab, 0)
+        return browser && ReadyFolderPath(browser) != ""
+    }
+    return false
+}
+
 ReadyFolderPath(browser) {
     if browser.Busy || browser.ReadyState != 4
         return ""
-    return browser.Document.Folder.Self.Path
+    path := browser.Document.Folder.Self.Path
+    ; Control Panel views share Explorer's window class but navigation can
+    ; open another standalone window instead of staying in the target tab.
+    if RegExMatch(path, "i)(^|\\)::\{(21EC2020-3AEA-1069-A2DD-08002B30309D|26EE0668-A00A-44D7-9371-BEB064C98683)\}(\\|$)")
+        return ""
+    return path
 }
