@@ -1,6 +1,9 @@
 @echo off
 if not exist "%~dp0runtime\AutoHotkey64.exe" (
-    echo AutoHotkey64.exe is missing from the runtime folder.
+    "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0CheckRelease.ps1" -EnsureRuntime
+)
+if not exist "%~dp0runtime\AutoHotkey64.exe" (
+    echo AutoHotkey64.exe could not be downloaded. Check your connection and try again.
     pause
     exit /b 1
 )

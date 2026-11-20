@@ -4,10 +4,11 @@ Bộ phím tắt AutoHotkey v2 để quản lý tab File Explorer, định dạn
 
 ## Cài đặt và chạy
 
-1. Clone kho này hoặc chọn **Code → Download ZIP** trên GitHub rồi giải nén toàn bộ.
-2. Nếu thư mục `runtime\` chưa có `AutoHotkey64.exe`, tải [ZIP portable AutoHotkey v2.0.31](https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.31/AutoHotkey_2.0.31.zip) và giải nén `AutoHotkey64.exe` vào đó. Tạo thư mục đó nếu chưa có. Bản portable dành cho Windows x64 và chạy trực tiếp.
-3. Bấm đúp vào [RunMainAhk.cmd](RunMainAhk.cmd). Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
-4. Để dùng các phím tắt SQL, cài [.NET 10 Runtime (Windows x64)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Cả hai công cụ SQL cần runtime này. Formatter đã có sẵn Python và SQLFluff.
+1. Tải `AutoHotkey-update.zip` từ [GitHub Releases](https://github.com/nguyentovan/AutoHotkey/releases/latest) rồi giải nén toàn bộ, hoặc clone repo.
+2. Bấm đúp vào [RunMainAhk.cmd](RunMainAhk.cmd). Nếu chưa có `runtime\AutoHotkey64.exe`, launcher sẽ tự tải bản portable Windows x64 v2.0.31 từ release chính thức của AutoHotkey và kiểm tra SHA-256. Cần mạng cho lần tải đầu tiên.
+3. Để dùng các phím tắt SQL, cài [.NET 10 Runtime (Windows x64)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Cả hai công cụ SQL cần runtime này. Formatter đã có sẵn Python và SQLFluff.
+
+Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
 
 Tính năng quản lý tab cần Windows 11 với File Explorer có hỗ trợ tab. Các phím tắt SQL hoạt động trong cửa sổ SSMS hoặc DBeaver đang được chọn.
 

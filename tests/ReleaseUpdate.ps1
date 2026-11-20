@@ -140,6 +140,7 @@ try {
     $script:updateManifest = $manifest
     $script:updateAnswer = 'n'
     $script:archiveRequests = 0
+    $script:runtimeRequests = 0
     function Invoke-RestMethod {
         [pscustomobject]@{
             tag_name = 'v1.2.3'
@@ -148,6 +149,11 @@ try {
     }
     function Invoke-WebRequest {
         param([switch]$UseBasicParsing, [string]$Uri, [string]$OutFile, [int]$TimeoutSec, $ErrorAction)
+        if ($Uri -eq 'https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.31/AutoHotkey_2.0.31.zip') {
+            $script:runtimeRequests++
+            Set-Content -LiteralPath $OutFile -Value 'not the official portable release'
+            return
+        }
         if ($Uri -eq 'https://github.com/nguyentovan/AutoHotkey/releases/download/v1.2.3/SHA256SUMS') {
             return [pscustomobject]@{ Content = [Text.Encoding]::ASCII.GetBytes($script:updateManifest) }
         }
@@ -187,7 +193,20 @@ try {
     New-Item -ItemType Directory -Path $transaction | Out-Null
     Repair-ReleaseTransaction $zipRoot $transaction
     Assert-Equal $false (Test-Path -LiteralPath $transaction) 'Recovered empty interrupted transaction'
-    Write-Output 'PASS: Git fast-forward, tagged ZIP packaging, download consent, SHA-256 validation and rollback.'
+
+    $bootstrapRoot = Join-Path $root 'fresh runtime download'
+    New-Item -ItemType Directory -Path $bootstrapRoot | Out-Null
+    Initialize-AutoHotkeyRuntime $zipRoot
+    Assert-Equal 0 $script:runtimeRequests 'Existing portable runtime skipped download'
+    try {
+        Initialize-AutoHotkeyRuntime $bootstrapRoot
+        throw 'UnexpectedBootstrapSuccess'
+    } catch {
+        if ($_.Exception.Message -notlike '*runtime ZIP SHA-256 mismatch*') { throw }
+    }
+    Assert-Equal 1 $script:runtimeRequests 'Missing runtime fetched from the official release'
+    Assert-Equal $false (Test-Path -LiteralPath (Join-Path $bootstrapRoot 'runtime\AutoHotkey64.exe')) 'Invalid runtime was never installed'
+    Write-Output 'PASS: Git fast-forward, ZIP update and rollback, runtime bootstrap guards.'
 } finally {
     $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
     $resolved = (Resolve-Path -LiteralPath $root).Path

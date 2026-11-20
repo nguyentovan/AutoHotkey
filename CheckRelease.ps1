@@ -1,3 +1,47 @@
+param([switch]$EnsureRuntime)
+
+
+function Initialize-AutoHotkeyRuntime($Root) {
+    $runtime = Join-Path $Root 'runtime'
+    $executable = Join-Path $runtime 'AutoHotkey64.exe'
+    if (Test-Path -LiteralPath $executable -PathType Leaf) { return }
+
+    $id = [guid]::NewGuid().ToString('N')
+    $download = Join-Path ([IO.Path]::GetTempPath()) "AutoHotkey-$id.zip"
+    $staged = Join-Path $runtime "AutoHotkey64-$id.tmp"
+    $uri = 'https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.31/AutoHotkey_2.0.31.zip'
+    $expectedHash = 'CA1A595ACA4528755D8D4CD7FED23D497A37BD9A0B6892072612D68DEE1BD00A'
+    try {
+        Write-Host 'Downloading AutoHotkey v2.0.31 portable from the official release...'
+        Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $download -TimeoutSec 60 -ErrorAction Stop
+        if ((Get-FileHash -LiteralPath $download -Algorithm SHA256 -ErrorAction Stop).Hash -ne $expectedHash) {
+            throw 'AutoHotkey runtime ZIP SHA-256 mismatch.'
+        }
+
+        New-Item -ItemType Directory -Path $runtime -Force -ErrorAction Stop | Out-Null
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $archive = [IO.Compression.ZipFile]::OpenRead($download)
+        try {
+            $entry = $archive.GetEntry('AutoHotkey64.exe')
+            if (!$entry) { throw 'The official ZIP is missing AutoHotkey64.exe.' }
+            [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $staged)
+        } finally {
+            $archive.Dispose()
+        }
+
+        try {
+            [IO.File]::Move($staged, $executable)
+        } catch [IO.IOException] {
+            # Another launcher may have installed the runtime while this one downloaded it.
+            if (!(Test-Path -LiteralPath $executable -PathType Leaf)) { throw }
+        }
+    } finally {
+        foreach ($path in @($staged, $download)) {
+            if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
+        }
+    }
+}
+
 
 function Get-ReleasePackageFiles {
     '.gitignore'
@@ -283,5 +327,14 @@ function Invoke-ReleaseCheck($Root) {
 
 if ($MyInvocation.InvocationName -ne '.') {
     $ErrorActionPreference = 'Stop'
+    if ($EnsureRuntime) {
+        try {
+            Initialize-AutoHotkeyRuntime $PSScriptRoot
+            exit 0
+        } catch {
+            Write-Warning "AutoHotkey runtime: $($_.Exception.Message)"
+            exit 1
+        }
+    }
     exit (Invoke-ReleaseCheck $PSScriptRoot)
 }
