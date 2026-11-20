@@ -5,7 +5,7 @@ Bộ phím tắt AutoHotkey v2 để quản lý tab File Explorer, định dạn
 ## Cài đặt và chạy
 
 1. Clone kho này hoặc chọn **Code → Download ZIP** trên GitHub rồi giải nén toàn bộ.
-2. Nếu thư mục `runtime\` chưa có `AutoHotkey64.exe`, tải [ZIP portable AutoHotkey v2.0.31](https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.31/AutoHotkey_2.0.31.zip) và giải nén `AutoHotkey64.exe` vào đó. Bản portable dành cho Windows x64 và chạy trực tiếp.
+2. Nếu thư mục `runtime\` chưa có `AutoHotkey64.exe`, tải [ZIP portable AutoHotkey v2.0.31](https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.31/AutoHotkey_2.0.31.zip) và giải nén `AutoHotkey64.exe` vào đó. Tạo thư mục đó nếu chưa có. Bản portable dành cho Windows x64 và chạy trực tiếp.
 3. Bấm đúp vào [RunMainAhk.cmd](RunMainAhk.cmd). Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
 4. Để dùng các phím tắt SQL, cài [.NET 10 Runtime (Windows x64)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Cả hai công cụ SQL cần runtime này. Formatter đã có sẵn Python và SQLFluff.
 
@@ -14,6 +14,19 @@ Tính năng quản lý tab cần Windows 11 với File Explorer có hỗ trợ t
 ### Cập nhật AutoHotkey portable
 
 Để cập nhật, thoát AutoHotkey từ khay hệ thống, tải gói `AutoHotkey_<phiên-bản>.zip` trong **Assets** của bản mới rồi chép đè `runtime\AutoHotkey64.exe` bằng tệp cùng tên trong ZIP. Mở lại `RunMainAhk.cmd` để chạy bản mới. Shortcut trỏ tới `RunMainAhk.cmd` vẫn dùng được. [Các bản phát hành AutoHotkey v2](https://github.com/AutoHotkey/AutoHotkey/releases)
+
+### Cập nhật bộ phím tắt qua GitHub Releases
+
+Khi mở `RunMainAhk.cmd`, launcher kiểm tra release chính thức mới nhất. Nếu không có release hoặc GitHub không truy cập được, launcher vẫn mở bộ phím tắt hiện tại.
+
+- Với bản clone Git, launcher so commit của tag release với `HEAD`. Nếu có thể cập nhật fast-forward và các tệp Git theo dõi đang sạch, launcher hỏi trước khi cập nhật. Nhánh đã phân kỳ hoặc có chỉnh sửa cục bộ cần xử lý bằng Git.
+- Với bản giải nén, launcher so SHA-256 của các tệp trong gói. Nếu có khác biệt, launcher hỏi trước khi tự tải và giải nén bản mới. Hãy từ chối nếu muốn giữ những chỉnh sửa cục bộ. Tệp `runtime\AutoHotkey64.exe` cập nhật riêng.
+
+Khi phát hành, tạo tag dạng `v1.2.3` tại commit cần phát hành rồi chạy lệnh sau từ thư mục repo. Đính kèm cả `AutoHotkey-update.zip` và `SHA256SUMS` vào GitHub Release của tag đó. Người cài từ ZIP có thể tải gói `AutoHotkey-update.zip` trong **Assets**. Giữ danh sách tệp trong gói tương thích với các launcher đã phát hành.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\NewReleaseAssets.ps1 -Tag v1.2.3 -OutputDirectory "$env:TEMP\AutoHotkey-v1.2.3"
+```
 
 ## File Explorer
 
