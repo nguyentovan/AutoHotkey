@@ -176,6 +176,22 @@ try {
     Assert-Equal 0 (Invoke-ReleaseCheck $zipRoot) 'Matching release check exit'
     Assert-Equal 1 $script:archiveRequests 'Current ZIP skipped download'
 
+    $script:releasePrompts = @()
+    function Show-ReleaseMessage($Message, $Buttons = 'OK', $Icon = 'Information') {
+        $script:releasePrompts += [pscustomobject]@{ Text = $Message; Buttons = $Buttons }
+        return 'No'
+    }
+    $Gui = $true
+    $script:updateAnswer = 'n'
+    Set-Content -LiteralPath $main -Value 'local before graphical prompt'
+    Assert-Equal 0 (Invoke-ReleaseCheck $zipRoot) 'Declined graphical ZIP check exit'
+    Assert-Equal 1 $script:releasePrompts.Count 'One graphical confirmation'
+    Assert-Equal 'YesNo' $script:releasePrompts[0].Buttons 'Dialog offers Yes and No'
+    Assert-Equal $true ($script:releasePrompts[0].Text.Contains('v1.2.3')) 'Dialog includes version'
+    Assert-Equal 1 $script:archiveRequests 'Declined graphical update skipped the archive'
+    Assert-Equal 'local before graphical prompt' (Get-Content -LiteralPath $main) 'Graphical decline preserved files'
+    $Gui = $false
+
     $clone = Join-Path $root 'clone from Git'
     & $git clone --quiet --no-local --no-tags --single-branch --branch pre-release -- $root $clone
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the release checkout fixture.' }
@@ -231,7 +247,7 @@ exit 1
     Assert-Equal 1 $LASTEXITCODE 'Fixture still lacks a runnable runtime'
     $startupSteps = (Get-Content -LiteralPath (Join-Path $bootstrapRoot 'startup-order.txt')) -join ', '
     Assert-Equal 'check release, new bootstrap' $startupSteps 'Check release before bootstrapping with the updated code'
-    Write-Output 'PASS: Git and ZIP updates, runtime bootstrap guards, and launcher startup order.'
+    Write-Output 'PASS: Git and ZIP updates, runtime bootstrap guards, launcher startup order.'
 } finally {
     $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
     $resolved = (Resolve-Path -LiteralPath $root).Path

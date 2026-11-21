@@ -1,5 +1,86 @@
-param([switch]$EnsureRuntime)
+﻿param([switch]$EnsureRuntime, [switch]$Gui)
 
+
+function Show-ReleaseMessage($Message, $Buttons = 'OK', $Icon = 'Information') {
+    Add-Type -AssemblyName System.Windows.Forms
+    $defaultButton = if ($Buttons -eq 'YesNo') { 'Button2' } else { 'Button1' }
+    return [Windows.Forms.MessageBox]::Show($Message, 'Cập nhật Zea.AutoHotkey', $Buttons, $Icon, $defaultButton)
+}
+
+function Confirm-ReleaseUpdate($Tag, $ConsolePrompt) {
+    if ($Gui) {
+        return (Show-ReleaseMessage "Đã có phiên bản $Tag. Bạn có muốn cập nhật không?" 'YesNo' 'Question') -eq 'Yes'
+    }
+    return (Read-Host $ConsolePrompt) -match '^(y|yes)$'
+}
+
+function Invoke-ReleaseOperation($Message, [scriptblock]$Action) {
+    $status = [hashtable]::Synchronized(@{ Message = $Message; Done = $false })
+    if (!$Gui) {
+        & $Action $status
+        return
+    }
+
+    $view = [powershell]::Create()
+    $windowRunspace = [runspacefactory]::CreateRunspace()
+    try {
+        $windowRunspace.ApartmentState = 'STA'
+        $windowRunspace.Open()
+        $view.Runspace = $windowRunspace
+        $null = $view.AddScript({
+            param($status)
+            $ErrorActionPreference = 'Stop'
+            Add-Type -AssemblyName System.Windows.Forms
+            [Windows.Forms.Application]::EnableVisualStyles()
+
+            $window = New-Object Windows.Forms.Form
+            $timer = New-Object Windows.Forms.Timer
+            try {
+                $window.Text = 'Cập nhật Zea.AutoHotkey'
+                $window.StartPosition = 'CenterScreen'
+                $window.FormBorderStyle = 'FixedDialog'
+                $window.ControlBox = $false
+                $window.AutoScaleMode = 'Dpi'
+                $window.ClientSize = New-Object Drawing.Size(400, 86)
+
+                $label = New-Object Windows.Forms.Label
+                $label.SetBounds(16, 14, 368, 22)
+                $label.Text = $status.Message
+                $window.Controls.Add($label)
+
+                $bar = New-Object Windows.Forms.ProgressBar
+                $bar.SetBounds(16, 43, 368, 18)
+                $bar.Style = 'Marquee'
+                $bar.MarqueeAnimationSpeed = 30
+                $window.Controls.Add($bar)
+
+                $timer.Interval = 100
+                $timer.Add_Tick({
+                    if ($status.Done) { $window.Close() }
+                    else { $label.Text = $status.Message }
+                })
+                if (!$status.Done) {
+                    $timer.Start()
+                    $null = $window.ShowDialog()
+                }
+            } finally {
+                $timer.Dispose()
+                $window.Dispose()
+            }
+        }).AddArgument($status)
+        $pending = $view.BeginInvoke()
+        try {
+            & $Action $status
+        } finally {
+            $status.Done = $true
+            try { $null = $view.EndInvoke($pending) }
+            catch { Write-Warning "Update window: $($_.Exception.Message)" }
+        }
+    } finally {
+        $view.Dispose()
+        $windowRunspace.Dispose()
+    }
+}
 
 function Initialize-AutoHotkeyRuntime($Root) {
     $runtime = Join-Path $Root 'runtime'
@@ -251,15 +332,27 @@ function Update-GitCheckout($Root, $Git, $Tag) {
     if ($LASTEXITCODE -ne 0) { return }
 
     switch (Get-GitReleaseState $Git $Root $target) {
-        'Dirty' { Write-Host "Release $Tag is available. Commit or stash your tracked changes before updating." }
-        'Diverged' { Write-Host "Release $Tag and the current branch have diverged. Update the branch manually." }
+        'Dirty' {
+            if ($Gui) {
+                $null = Show-ReleaseMessage "Đã có phiên bản $Tag. Hãy commit hoặc stash các thay đổi cục bộ trước khi cập nhật." 'OK' 'Warning'
+            } else {
+                Write-Host "Release $Tag is available. Commit or stash your tracked changes before updating."
+            }
+        }
+        'Diverged' {
+            if ($Gui) {
+                $null = Show-ReleaseMessage "Đã có phiên bản $Tag. Nhánh hiện tại đã phân kỳ và cần cập nhật thủ công bằng Git." 'OK' 'Warning'
+            } else {
+                Write-Host "Release $Tag and the current branch have diverged. Update the branch manually."
+            }
+        }
         'Ready' {
-            if ((Read-Host "Update this checkout to release $Tag [y/N]") -match '^(y|yes)$') {
-                if (Merge-GitRelease $Git $Root $branch $head $target) {
-                    Write-Host "Updated to $Tag."
-                } else {
-                    Write-Warning 'Git could not apply the release as a clean fast-forward.'
+            if (!(Confirm-ReleaseUpdate $Tag "Update this checkout to release $Tag [y/N]")) { return }
+            Invoke-ReleaseOperation "Đang cập nhật lên $Tag…" {
+                if (!(Merge-GitRelease $Git $Root $branch $head $target)) {
+                    throw 'Git could not apply the release as a clean fast-forward.'
                 }
+                Write-Host "Updated to $Tag."
             }
         }
     }
@@ -273,15 +366,19 @@ function Update-ZipInstall($Root, $Release) {
     $expected = Get-PackageHashes $manifest
     $local = Get-LocalReleaseHashes $Root $expected.Keys
     if (Test-ReleaseHashes $expected $local) { return }
-    if ((Read-Host "Release $($Release.tag_name) differs from these files. Download and replace them [y/N]") -notmatch '^(y|yes)$') { return }
+    if (!(Confirm-ReleaseUpdate $Release.tag_name "Release $($Release.tag_name) differs from these files. Download and replace them [y/N]")) { return }
 
-    $download = Join-Path ([IO.Path]::GetTempPath()) ('ahk-release-' + [guid]::NewGuid() + '.zip')
-    try {
-        Invoke-WebRequest -UseBasicParsing -Uri "$downloadBase/AutoHotkey-update.zip" -OutFile $download -TimeoutSec 120 -ErrorAction Stop
-        Install-ReleaseZip $Root $download $manifest $local
-        Write-Host "Updated to $($Release.tag_name)."
-    } finally {
-        if (Test-Path -LiteralPath $download) { Remove-Item -LiteralPath $download -Force }
+    Invoke-ReleaseOperation "Đang tải phiên bản $($Release.tag_name)…" {
+        param($status)
+        $download = Join-Path ([IO.Path]::GetTempPath()) ('ahk-release-' + [guid]::NewGuid() + '.zip')
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri "$downloadBase/AutoHotkey-update.zip" -OutFile $download -TimeoutSec 120 -ErrorAction Stop
+            $status.Message = 'Đang xác minh và cài đặt bản cập nhật…'
+            Install-ReleaseZip $Root $download $manifest $local
+            Write-Host "Updated to $($Release.tag_name)."
+        } finally {
+            if (Test-Path -LiteralPath $download) { Remove-Item -LiteralPath $download -Force }
+        }
     }
 }
 
@@ -315,7 +412,16 @@ function Invoke-ReleaseCheck($Root) {
             return 0
         } catch {
             Write-Warning "Release update: $($_.Exception.Message)"
-            if (Test-Path -LiteralPath $transaction) { return 2 }
+            $requiresRecovery = Test-Path -LiteralPath $transaction
+            if ($Gui) {
+                $message = if ($requiresRecovery) {
+                    'Không thể khôi phục bản cài đặt. AutoHotkey sẽ chưa được mở.'
+                } else {
+                    'Không thể hoàn tất cập nhật. AutoHotkey sẽ mở phiên bản hiện tại.'
+                }
+                $null = Show-ReleaseMessage "$message $($_.Exception.Message)" 'OK' 'Warning'
+            }
+            if ($requiresRecovery) { return 2 }
             return 0
         } finally {
             $mutex.ReleaseMutex()
@@ -329,10 +435,17 @@ if ($MyInvocation.InvocationName -ne '.') {
     $ErrorActionPreference = 'Stop'
     if ($EnsureRuntime) {
         try {
-            Initialize-AutoHotkeyRuntime $PSScriptRoot
+            if (!(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'runtime\AutoHotkey64.exe') -PathType Leaf)) {
+                Invoke-ReleaseOperation 'Đang tải AutoHotkey portable…' {
+                    Initialize-AutoHotkeyRuntime $PSScriptRoot
+                }
+            }
             exit 0
         } catch {
             Write-Warning "AutoHotkey runtime: $($_.Exception.Message)"
+            if ($Gui) {
+                $null = Show-ReleaseMessage "Không thể cài AutoHotkey portable. $($_.Exception.Message)" 'OK' 'Error'
+            }
             exit 1
         }
     }
