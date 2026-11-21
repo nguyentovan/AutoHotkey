@@ -3,37 +3,6 @@
 if A_LineFile = A_ScriptFullPath
     ExitApp()
 
-; Main includes this variant before the converter so both commands share Ctrl+K.
-#HotIf IsSqlFormatEditor()
-$^k:: {
-    editor := WinActive("A")
-    chord := InputHook("V T1.5")
-    chord.KeyOpt("{All}", "E")
-    chord.KeyOpt("{LControl}{RControl}", "-E +N")
-    chord.KeyOpt("gy", "+S")
-    chord.OnKeyUp := (hook, vk, sc) => hook.Stop()
-    chord.Start()
-    chord.Wait()
-    key := chord.EndKey
-    if (key != "G" && key != "Y") || !InStr(chord.EndMods, "^")
-        return
-    if !KeyWait(key, "T2")
-        return
-    KeyWait("Ctrl", "T2")
-    if GetKeyState("Ctrl", "P") || !WinActive(editor)
-        return
-    if key = "G"
-        GetSqlConvertFunction("ConvertSqlSelection").Call(editor)
-    else
-        FormatSqlSelection(editor)
-}
-#HotIf
-
-IsSqlFormatEditor() {
-    return (WinActive("ahk_exe ssms.exe") || WinActive("ahk_exe dbeaver.exe"))
-        && GetSqlConvertFunction("ConvertSqlSelection")
-}
-
 FormatSqlSelection(editor) {
     originalClipboard := ClipboardAll()
     errorMessage := ""

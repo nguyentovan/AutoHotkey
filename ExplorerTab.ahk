@@ -4,8 +4,10 @@ if A_LineFile = A_ScriptFullPath
     ExitApp()
 
 desktopFolderOpen := 0
-WatchExplorerWindows()
+if ExplorerFeatureEnabled()
+    WatchExplorerWindows()
 
+#HotIf ExplorerFeatureEnabled()
 #e:: {
     for explorer in WinGetList("ahk_class CabinetWClass ahk_exe explorer.exe") {
         if !HasReadyExplorerTab(explorer)
@@ -43,6 +45,13 @@ WatchExplorerWindows()
         }
         last := {Control: control, X: x, Y: y, Tick: now}
     }
+}
+
+#HotIf
+
+ExplorerFeatureEnabled() {
+    global explorerTabsEnabled
+    return explorerTabsEnabled ?? true
 }
 
 FocusOpenedDesktopFolder(path) {

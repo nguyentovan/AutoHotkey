@@ -8,6 +8,8 @@ Bộ phím tắt AutoHotkey v2 để quản lý tab File Explorer, định dạn
 2. Bấm đúp vào [RunMainAhk.cmd](RunMainAhk.cmd). Nếu chưa có `runtime\AutoHotkey64.exe`, launcher sẽ tự tải bản portable Windows x64 v2.0.31 từ release chính thức của AutoHotkey và kiểm tra SHA-256. Cần mạng cho lần tải đầu tiên.
 3. Để dùng các phím tắt SQL, cài [.NET 10 Runtime (Windows x64)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). Cả hai công cụ SQL cần runtime này. Formatter đã có sẵn Python và SQLFluff.
 
+Để bật hoặc tắt từng chức năng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Chọn chức năng…**. Mặc định cả ba mục đều bật. Bấm **Lưu và nạp lại** để áp dụng. Lựa chọn được lưu trong Main.ini cạnh Main.ahk.
+
 Để dừng, nhấp chuột phải vào biểu tượng AutoHotkey ở khay hệ thống và chọn **Exit**.
 
 Tính năng quản lý tab cần Windows 11 với File Explorer có hỗ trợ tab. Các phím tắt SQL hoạt động trong cửa sổ SSMS hoặc DBeaver đang được chọn.
@@ -41,9 +43,9 @@ Bôi đen câu SQL hoặc một khối log trong trình soạn thảo. Giữ **C
 | Phím tắt | Văn bản cần chọn | Kết quả |
 | --- | --- | --- |
 | **Ctrl + K**, **Ctrl + Y** | Đoạn SQL | Thay vùng chọn bằng SQL đã định dạng. |
-| **Ctrl + K**, **Ctrl + G** | Một khối log SQL có câu lệnh và thông tin tham số | Chuyển log thành SQL, định dạng kết quả rồi thay vào vùng chọn. |
+| **Ctrl + K**, **Ctrl + G** | Một khối log SQL có câu lệnh và thông tin tham số | Thay vùng chọn bằng SQL chuyển từ log. Kết quả được định dạng khi bật **Định dạng SQL**. |
 
-SSMS dùng T-SQL. Trong DBeaver, cả hai phím tắt chọn dialect dựa trên mục **Type** của tab SQL đang mở. Năm dialect được ưu tiên hỗ trợ là **SQL Server (T-SQL), PostgreSQL, MySQL, SQLite và Oracle**.
+Khi định dạng, SSMS dùng T-SQL. Trong DBeaver, script chọn dialect dựa trên mục **Type** của tab SQL đang mở. Năm dialect được ưu tiên hỗ trợ là **SQL Server (T-SQL), PostgreSQL, MySQL, SQLite và Oracle**.
 
 Phím tắt DBeaver cũng nhận diện thêm các driver khác. Chạy `Zea.SqlFormat.exe --dialects` để xem danh sách dialect của formatter CLI. Nếu thiếu thông tin kết nối hoặc formatter gặp lỗi, phím tắt báo lỗi và giữ nguyên vùng chọn.
 

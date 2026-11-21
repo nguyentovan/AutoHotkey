@@ -3,25 +3,39 @@
 if A_LineFile = A_ScriptFullPath
     ExitApp()
 
-#HotIf WinActive("ahk_exe ssms.exe") || WinActive("ahk_exe dbeaver.exe")
+#HotIf (WinActive("ahk_exe ssms.exe") || WinActive("ahk_exe dbeaver.exe")) && SqlChordKeys() != ""
 $^k:: {
     editor := WinActive("A")
+    keys := SqlChordKeys()
     chord := InputHook("V T1.5")
     chord.KeyOpt("{All}", "E")
     chord.KeyOpt("{LControl}{RControl}", "-E +N")
-    chord.KeyOpt("g", "+S")
+    chord.KeyOpt(keys, "+S")
     chord.OnKeyUp := (hook, vk, sc) => hook.Stop()
     chord.Start()
     chord.Wait()
-    if chord.EndKey != "G" || !InStr(chord.EndMods, "^")
+    key := chord.EndKey
+    if key = "" || !InStr(keys, key) || !InStr(chord.EndMods, "^")
         return
-    if !KeyWait("g", "T2")
+    if !KeyWait(key, "T2")
         return
     KeyWait("Ctrl", "T2")
-    if !GetKeyState("Ctrl", "P") && WinActive(editor)
+    if GetKeyState("Ctrl", "P") || !WinActive(editor)
+        return
+    if key = "G"
         ConvertSqlSelection(editor)
+    else
+        FormatSqlSelection(editor)
 }
 #HotIf
+
+SqlChordKeys() {
+    global
+    local keys := (sqlLogConvertEnabled ?? true) ? "g" : ""
+    if GetEnabledSqlFormatter()
+        keys .= "y"
+    return keys
+}
 
 ConvertSqlSelection(editor) {
     originalClipboard := ClipboardAll()
@@ -88,12 +102,14 @@ ClipboardHasWholeLine() {
     return false
 }
 
-GetLogFormatTarget(editor) {
+GetEnabledSqlFormatter() {
     global
     local formatter := "FormatSqlText"
-    if IsSet(%formatter%)
-        return GetSqlFormatTarget(editor)
-    return false
+    return (sqlFormatEnabled ?? true) && IsSet(%formatter%) ? %formatter% : false
+}
+
+GetLogFormatTarget(editor) {
+    return GetEnabledSqlFormatter() ? GetSqlFormatTarget(editor) : false
 }
 
 RunSqlWithProgress(editor, message, action) {
@@ -127,11 +143,9 @@ RunSqlWithProgress(editor, message, action) {
 }
 
 ConvertAndFormatSqlText(log, directory, dialect) {
-    global
-    local sql := ConvertSqlLogText(log, directory "\Zea.SqlLogConvert.exe")
-    local formatter := "FormatSqlText"
-    if dialect != "" && IsSet(%formatter%)
-        sql := %formatter%.Call(sql, directory, dialect)
+    sql := ConvertSqlLogText(log, directory "\Zea.SqlLogConvert.exe")
+    if dialect != "" && (formatter := GetEnabledSqlFormatter())
+        sql := formatter.Call(sql, directory, dialect)
     return sql
 }
 
